@@ -3,6 +3,7 @@
 // Serves the Jarvis dashboard, runs sweep cycle, pushes live updates via SSE
 
 import express from 'express';
+import { randomBytes } from 'crypto';
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
@@ -234,6 +235,47 @@ if (discordAlerter.isConfigured) {
 
 // === Express Server ===
 const app = express();
+
+function generateNonce() {
+  return randomBytes(16).toString('base64url');
+}
+
+// ─── Rate limiting ────────────────────────────────────────────────────────
+const _apiRateLog = new Map(); // ip -> { count, windowStart }
+const _sseConnCount = new Map(); // ip -> count
+
+function apiRateLimit(maxPerMinute = 60) {
+  return (req, res, next) => {
+    const ip = req.ip || req.socket?.remoteAddress || 'unknown';
+    const now = Date.now();
+    const entry = _apiRateLog.get(ip) || { count: 0, windowStart: now };
+    if (now - entry.windowStart > 60_000) { entry.count = 1; entry.windowStart = now; }
+    else entry.count++;
+    _apiRateLog.set(ip, entry);
+    if (entry.count > maxPerMinute) return res.status(429).json({ error: 'Too many requests' });
+    next();
+  };
+}
+
+function sseConcurrencyLimit(maxPerIp = 5) {
+  return (req, res, next) => {
+    const ip = req.ip || req.socket?.remoteAddress || 'unknown';
+    const current = _sseConnCount.get(ip) || 0;
+    if (current >= maxPerIp) return res.status(429).json({ error: 'Too many connections' });
+    _sseConnCount.set(ip, current + 1);
+    req.on('close', () => _sseConnCount.set(ip, Math.max(0, (_sseConnCount.get(ip) || 1) - 1)));
+    next();
+  };
+}
+
+// Hardening headers applied to every response
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
+
 app.use(express.static(join(ROOT, 'dashboard/public')));
 
 // Serve loading page until first sweep completes, then the dashboard with injected locale
@@ -241,26 +283,41 @@ app.get('/', (req, res) => {
   if (!currentData) {
     res.sendFile(join(ROOT, 'dashboard/public/loading.html'));
   } else {
+    const nonce = generateNonce();
+
     const htmlPath = join(ROOT, 'dashboard/public/jarvis.html');
     let html = readFileSync(htmlPath, 'utf-8');
-    
-    // Inject locale data into the HTML
+
+    // Add nonce to every <script> tag so the CSP allows them
+    html = html.replace(/<script(\s|>)/g, (m, after) => `<script nonce="${nonce}"${after}`);
+
+    // Inject locale data (also nonce-tagged)
     const locale = getLocale();
-    const localeScript = `<script>window.__CRUCIX_LOCALE__ = ${JSON.stringify(locale).replace(/<\/script>/gi, '<\\/script>')};</script>`;
+    const localeScript = `<script nonce="${nonce}">window.__CRUCIX_LOCALE__ = ${JSON.stringify(locale).replace(/<\/script>/gi, '<\\/script>')};</script>`;
     html = html.replace('</head>', `${localeScript}\n</head>`);
-    
+
+    res.setHeader('Content-Security-Policy', [
+      `script-src 'nonce-${nonce}' 'strict-dynamic' https://cdnjs.cloudflare.com https://d3js.org https://unpkg.com`,
+      `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
+      `font-src https://fonts.gstatic.com`,
+      `img-src 'self' data: blob:`,
+      `connect-src 'self'`,
+      `frame-ancestors 'none'`,
+      `default-src 'self'`,
+    ].join('; '));
+
     res.type('html').send(html);
   }
 });
 
 // API: current data
-app.get('/api/data', (req, res) => {
+app.get('/api/data', apiRateLimit(), (req, res) => {
   if (!currentData) return res.status(503).json({ error: 'No data yet — first sweep in progress' });
   res.json(currentData);
 });
 
 // API: health check
-app.get('/api/health', (req, res) => {
+app.get('/api/health', apiRateLimit(), (req, res) => {
   res.json({
     status: 'ok',
     uptime: Math.floor((Date.now() - startTime) / 1000),
@@ -281,7 +338,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // API: available locales
-app.get('/api/locales', (req, res) => {
+app.get('/api/locales', apiRateLimit(), (req, res) => {
   res.json({
     current: currentLanguage,
     supported: getSupportedLocales(),
@@ -289,7 +346,7 @@ app.get('/api/locales', (req, res) => {
 });
 
 // SSE: live updates
-app.get('/events', (req, res) => {
+app.get('/events', sseConcurrencyLimit(), (req, res) => {
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',

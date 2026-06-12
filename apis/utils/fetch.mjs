@@ -12,6 +12,20 @@ export async function safeFetch(url, opts = {}) {
         headers: { 'User-Agent': 'Crucix/1.0', ...headers },
       });
       clearTimeout(timer);
+
+      if (res.status === 429) {
+        // Respect Retry-After header; fall back to exponential backoff capped at 60 s
+        const retryAfterSec = parseInt(res.headers.get('Retry-After') || '0', 10);
+        const backoffMs = retryAfterSec > 0
+          ? retryAfterSec * 1000
+          : Math.min(60_000, 5000 * Math.pow(2, i));
+        if (i < retries) {
+          await new Promise(r => setTimeout(r, backoffMs));
+          continue;
+        }
+        throw new Error(`HTTP 429: rate limited (backoff ${backoffMs}ms)`);
+      }
+
       if (!res.ok) {
         const body = await res.text().catch(() => '');
         throw new Error(`HTTP ${res.status}: ${body.slice(0, 200)}`);
