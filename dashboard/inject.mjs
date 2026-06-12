@@ -720,7 +720,7 @@ async function cliInject() {
   }
   console.log(`Generated ${V2.ideas.length} leverageable ideas`);
 
-  const json = JSON.stringify(V2);
+  const json = JSON.stringify(V2).replace(/<\/script/gi, '<\\/script').replace(/<!--/g, '<\\!--');
   console.log('\n--- Synthesis ---');
   console.log('Size:', json.length, 'bytes | Air:', V2.air.length, '| Thermal:', V2.thermal.length,
     '| News:', V2.news.length, '| Ideas:', V2.ideas.length, '| Sources:', V2.health.length);

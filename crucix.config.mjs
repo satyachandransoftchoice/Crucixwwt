@@ -17,6 +17,7 @@ export default {
   telegram: {
     botToken: process.env.TELEGRAM_BOT_TOKEN || null,
     chatId: process.env.TELEGRAM_CHAT_ID || null,
+    allowedUserId: process.env.TELEGRAM_ALLOWED_USER_ID || null, // Optional: restrict commands to one sender ID
     botPollingInterval: parseInt(process.env.TELEGRAM_POLL_INTERVAL) || 5000,
     channels: process.env.TELEGRAM_CHANNELS || null, // Comma-separated extra channel IDs
   },

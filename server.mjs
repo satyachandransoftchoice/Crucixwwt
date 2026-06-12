@@ -14,7 +14,7 @@ import { synthesize, generateIdeas } from './dashboard/inject.mjs';
 import { MemoryManager } from './lib/delta/index.mjs';
 import { createLLMProvider } from './lib/llm/index.mjs';
 import { generateLLMIdeas } from './lib/llm/ideas.mjs';
-import { TelegramAlerter } from './lib/alerts/telegram.mjs';
+import { TelegramAlerter, escapeMd } from './lib/alerts/telegram.mjs';
 import { DiscordAlerter } from './lib/alerts/discord.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -119,7 +119,7 @@ if (telegramAlerter.isConfigured) {
       sections.push(`📡 OSINT: ${tg.urgent.length} urgent signals, ${tg.posts || 0} total posts`);
       // Top 2 urgent
       for (const p of tg.urgent.slice(0, 2)) {
-        sections.push(`  • ${(p.text || '').substring(0, 80)}`);
+        sections.push(`  • ${escapeMd((p.text || '').substring(0, 80))}`);
       }
       sections.push('');
     }
@@ -207,7 +207,7 @@ if (discordAlerter.isConfigured) {
     if (tg.urgent?.length > 0) {
       sections.push(`📡 OSINT: ${tg.urgent.length} urgent signals, ${tg.posts || 0} total posts`);
       for (const p of tg.urgent.slice(0, 2)) {
-        sections.push(`  • ${(p.text || '').substring(0, 80)}`);
+        sections.push(`  • ${escapeMd((p.text || '').substring(0, 80))}`);
       }
       sections.push('');
     }
