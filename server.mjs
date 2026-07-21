@@ -298,6 +298,11 @@ app.get('/', (req, res) => {
 
     res.setHeader('Content-Security-Policy', [
       `script-src 'nonce-${nonce}' 'strict-dynamic' https://cdnjs.cloudflare.com https://d3js.org https://unpkg.com`,
+      // Separate from script-src: the dashboard wires its buttons with inline onclick="" attributes.
+      // Nonces don't cover event-handler attributes, and adding a nonce disables the 'unsafe-inline'
+      // fallback for the directive it's on — so this must be its own un-nonced directive to take effect.
+      // <script> tag injection (the higher-impact vector) stays fully blocked by script-src above.
+      `script-src-attr 'unsafe-inline'`,
       `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
       `font-src https://fonts.gstatic.com`,
       // Globe textures (earth-night.jpg, earth-topology.png) load from unpkg's three-globe package
