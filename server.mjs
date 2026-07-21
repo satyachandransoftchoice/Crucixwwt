@@ -300,8 +300,11 @@ app.get('/', (req, res) => {
       `script-src 'nonce-${nonce}' 'strict-dynamic' https://cdnjs.cloudflare.com https://d3js.org https://unpkg.com`,
       `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
       `font-src https://fonts.gstatic.com`,
-      `img-src 'self' data: blob:`,
-      `connect-src 'self'`,
+      // Globe textures (earth-night.jpg, earth-topology.png) load from unpkg's three-globe package
+      // via a protocol-relative URL, which resolves to http:// on this plain-HTTP local dev server
+      `img-src 'self' data: blob: https://unpkg.com http://unpkg.com`,
+      // Flat-map country borders fetched client-side from jsdelivr's world-atlas package
+      `connect-src 'self' https://cdn.jsdelivr.net`,
       `frame-ancestors 'none'`,
       `default-src 'self'`,
     ].join('; '));
