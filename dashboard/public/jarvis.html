@@ -404,6 +404,7 @@ let lowPerfMode = localStorage.getItem('crucix_low_perf') === 'true';
 let isFlat = shouldStartFlat();
 let currentRegion = 'world';
 let flatSvg, flatProjection, flatPath, flatG, flatZoom, flatW, flatH;
+let rotateTimeout;
 const signalGuideItems = [
   {
     term:'No Callsign',
@@ -814,7 +815,6 @@ function initGlobe(){
   globe.controls().dampingFactor = 0.1;
 
   // Stop auto-rotate on interaction, resume after 10s
-  let rotateTimeout;
   const el = document.getElementById('globeViz');
   el.addEventListener('mousedown', () => {
     globe.controls().autoRotate = false;
@@ -1310,9 +1310,12 @@ function setRegion(r){
     const cx=(p0[0]+p1[0])/2,cy=(p0[1]+p1[1])/2;
     const scale=Math.min(flatW/dx,flatH/dy)*0.85;
     flatSvg.transition().duration(750).call(flatZoom.transform,d3.zoomIdentity.translate(flatW/2-scale*cx,flatH/2-scale*cy).scale(scale));
-  } else {
+  } else if(globe){
+    globe.controls().autoRotate = false;
+    clearTimeout(rotateTimeout);
     const pov=regionPOV[r]||regionPOV.world;
     globe.pointOfView(pov,1000);
+    rotateTimeout = setTimeout(() => { if(globe && !lowPerfMode) globe.controls().autoRotate = true; }, 10000);
   }
 }
 
