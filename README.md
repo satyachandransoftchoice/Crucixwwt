@@ -4,6 +4,8 @@
 
 **Your own intelligence terminal. 27 sources. One command. Zero cloud.**
 
+> ⚠️ **Experimental fork.** This is a modified, work-in-progress version of [calesthio/Crucix](https://github.com/calesthio/Crucix) — not the official project or site.
+
 ## [Visit The Live Site: crucix.live](https://www.crucix.live/)
 
 [![Live Website](https://img.shields.io/badge/live-crucix.live-00d4ff?style=for-the-badge)](https://www.crucix.live/)
